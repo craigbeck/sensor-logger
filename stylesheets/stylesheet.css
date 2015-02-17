@@ -335,6 +335,10 @@ footer a:hover {
   content: '.';
 }
 
+.librato-metrics + h3 {
+  padding-top: 40px;
+}
+
 .clearfix {display: inline-block;}
 * html .clearfix {height: 1%;}
 .clearfix {display: block;}
