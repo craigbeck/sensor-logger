@@ -15,6 +15,7 @@
   "license": "MIT",
   "dependencies": {
     "librato-metrics": "0.0.7",
+    "lodash": "^3.2.0",
     "serialport": "^1.5.0"
   }
 }
