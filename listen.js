@@ -36,6 +36,10 @@ serialport.list(function (err, comPorts) {
     parser: parser
   });
 
+  port.on("error", function (err) {
+    console.log("ERR port", err.stack);
+  });
+
   port.on("open", function () {
     log("open!");
     port.on("data", function (data) {
@@ -50,7 +54,7 @@ serialport.list(function (err, comPorts) {
           ]
         }, function (err, response) {
           if (err) {
-            log("ERR", err);
+            log("ERR librato", err);
           }
         });
       } catch (e) {
