@@ -14,16 +14,19 @@ The Arduino should send newline-delimited JSON on the serial port:
 {"tempC": 21.5, "pressurePa": 101325, "realAtltitudeM": 45.2}
 ```
 
-The app detects the Arduino by vendor ID (`0x2341`) from the port listing.
+The app detects the Arduino by vendor ID (`2341`) from the port listing.
 
 ## Prerequisites
 
-- Node.js
+- Node.js 22+ (use [asdf](https://asdf-vm.com) with the included `.tool-versions`)
 - A Librato account (get credentials at [librato.com](https://www.librato.com))
 
 ## Setup
 
 ```sh
+# If using asdf
+asdf install
+
 npm install
 ```
 
@@ -38,6 +41,12 @@ export LIBRATO_KEY=your-librato-api-key
 
 ```sh
 node listen.js [baudrate]
+```
+
+Or via npm:
+
+```sh
+npm start [baudrate]
 ```
 
 The optional `baudrate` argument defaults to `57600`.

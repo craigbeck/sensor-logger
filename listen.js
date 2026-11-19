@@ -1,68 +1,74 @@
-var serialport = require("serialport");
-var SerialPort = serialport.SerialPort;
-var util = require("util");
-var _ = require("lodash");
+import { SerialPort } from "serialport";
+import { ReadlineParser } from "@serialport/parser-readline";
+import Librato from "librato-metrics";
 
-var baudrate = process.argv[2] || 57600;
-var parser = serialport.parsers.readline("\n");
+const baudRate = parseInt(process.argv[2] || "57600", 10);
 
-var librato = require("librato-metrics").createClient({
+const librato = Librato.createClient({
   email: process.env.LIBRATO_EMAIL,
-  token: process.env.LIBRATO_KEY
+  token: process.env.LIBRATO_KEY,
 });
 
-var log = function () {
-  var message = util.format.apply(util.format, arguments);
-  console.log("%s - %s", new Date(), message);
-};
+function log(...args) {
+  console.log(new Date().toISOString(), "-", ...args);
+}
 
-serialport.list(function (err, comPorts) {
-  if (err) {
-    return console.error("Could not list com ports", err);
-  }
-
-  var portdef = _(comPorts)
-    .find(function (comPort) {
-      return comPort.vendorId === "0x2341";
-    });
-
-  if (!portdef) {
-    return console.error("No Ardnuino found");
-  }
-  log("Found Arduino on", portdef.comName);
-
-  var port = new SerialPort(portdef.comName, {
-    baudrate: 57600,
-    parser: parser
-  });
-
-  port.on("error", function (err) {
-    console.log("ERR port", err.stack);
-  });
-
-  port.on("open", function () {
-    log("open!");
-    port.on("data", function (data) {
-      try {
-        var json = JSON.parse(data);
-        log("DATA OK", JSON.stringify(json));
-        librato.post("/metrics", {
-          gauges: [
-            { name: "tempC", value: json.tempC, source: "desk" },
-            { name: "pressurePa", value: json.pressurePa, source: "desk" },
-            { name: "altitude", value: json.realAtltitudeM, source: "desk" }
-          ]
-        }, function (err, response) {
-          if (err) {
-            log("ERR librato", err);
-          }
-        });
-      } catch (e) {
-        log("DATAERR", data.toString());
+function postMetrics(json) {
+  return new Promise((resolve, reject) => {
+    librato.post(
+      "/metrics",
+      {
+        gauges: [
+          { name: "tempC", value: json.tempC, source: "desk" },
+          { name: "pressurePa", value: json.pressurePa, source: "desk" },
+          { name: "altitude", value: json.realAtltitudeM, source: "desk" },
+        ],
+      },
+      (err, response) => {
+        if (err) reject(err);
+        else resolve(response);
       }
-    });
+    );
+  });
+}
+
+async function main() {
+  const ports = await SerialPort.list();
+  // Arduino USB vendor ID (without 0x prefix, as returned by modern serialport)
+  const portDef = ports.find((p) => p.vendorId === "2341");
+
+  if (!portDef) {
+    console.error("No Arduino found");
+    process.exit(1);
+  }
+
+  log("Found Arduino on", portDef.path);
+
+  const port = new SerialPort({ path: portDef.path, baudRate });
+  const parser = port.pipe(new ReadlineParser({ delimiter: "\n" }));
+
+  port.on("error", (err) => {
+    console.error("Serial port error:", err.message);
   });
 
-  log("starting...");
-});
+  port.on("open", () => {
+    log("Port open");
+  });
 
+  parser.on("data", async (data) => {
+    try {
+      const json = JSON.parse(data);
+      log("DATA OK", JSON.stringify(json));
+      await postMetrics(json);
+    } catch (e) {
+      log("DATAERR", data.toString(), e.message);
+    }
+  });
+
+  log("Starting...");
+}
+
+main().catch((err) => {
+  console.error("Fatal:", err);
+  process.exit(1);
+});
